@@ -17,10 +17,10 @@ export default defineConfig({
         "android-chrome-512x512.png"
       ],
       manifest: {
-        name: "Drug Flashcards",
-        short_name: "Drug Cards",
+        name: "Study Cards",
+        short_name: "Study Cards",
         description:
-          "Offline-first flashcards and quick drug reference for study and work.",
+          "Offline-first flashcards and quick reference cards for study and work.",
         theme_color: "#1d3557",
         background_color: "#f4efe3",
         display: "standalone",
