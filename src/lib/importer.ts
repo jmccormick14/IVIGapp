@@ -47,13 +47,38 @@ function parseDelimited(content: string, delimiter: string): ParsedImport {
     throw new Error("No rows found in the imported content.");
   }
 
-  const [headers, ...dataRows] = rows;
+  const normalizedRows = stripMetadataRows(rows);
+  const [headers, ...dataRows] = normalizedRows;
 
   return {
     headers,
     rows: dataRows,
     suggestedName: "Imported Deck"
   };
+}
+
+function stripMetadataRows(rows: string[][]): string[][] {
+  if (rows.length < 3) {
+    return rows;
+  }
+
+  const firstRow = rows[0].map((cell) => cell.toLowerCase());
+  const secondRow = rows[1].map((cell) => cell.toLowerCase());
+  const thirdRow = rows[2].map((cell) => cell.toLowerCase());
+
+  const looksLikeMetadataHeader = firstRow[0] === "key" && firstRow[1] === "value";
+  const looksLikeVersionRow = secondRow[0] === "version";
+  const looksLikeFlashcardHeader =
+    thirdRow.includes("drug") &&
+    thirdRow.includes("question") &&
+    thirdRow.includes("answer") &&
+    thirdRow.includes("type");
+
+  if (looksLikeMetadataHeader && looksLikeVersionRow && looksLikeFlashcardHeader) {
+    return rows.slice(2);
+  }
+
+  return rows;
 }
 
 function parseDelimitedRows(content: string, delimiter: string): string[][] {
