@@ -330,6 +330,10 @@ select {
   justify-content: flex-end;
 }
 
+.grow-field {
+  flex: 1;
+}
+
 .summary-strip {
   margin-bottom: 16px;
   justify-content: flex-start;

@@ -4,6 +4,7 @@ import {
   parseImportText,
   suggestFieldMapping
 } from "./lib/importer";
+import { createId } from "./lib/ids";
 import {
   deleteDeck,
   ensureSeedDeck,
@@ -46,6 +47,16 @@ const LEGACY_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vT2AU0SWUQCCt2F5ixm66b-P0hgb94EOYq7NlHM-B2ijn5gTReD4HNLIsncYPku--OIWM-TPpPWYclF/pub?gid=1025900712&single=true&output=tsv";
 const LEGACY_IMPORT_KEY = "legacy-deck-imported";
 const LEGACY_DECK_NAME = "Legacy Drug Sheet";
+const COMMON_SECTION_LABELS = [
+  "Indications",
+  "Pre Meds",
+  "Filter",
+  "Assessment",
+  "Route/Admin",
+  "Observation",
+  "Side Effects",
+  "Notes"
+] as const;
 
 type ViewMode = "study" | "work";
 type StudyFilter = "all" | "missed" | "mastered";
@@ -80,6 +91,59 @@ function buildSearchText(drugName: string, aliases: string[], sections: DrugRefe
   return [drugName, ...aliases, ...sections.map((section) => `${section.label} ${section.content}`)]
     .join(" ")
     .toLowerCase();
+}
+
+function buildQuestionForSection(drugName: string, label: string): string {
+  const normalized = label.trim().toLowerCase();
+
+  if (normalized === "indications" || normalized === "indication") {
+    return `What are the indications for ${drugName}?`;
+  }
+
+  if (normalized === "pre meds" || normalized === "pre-meds" || normalized === "premeds") {
+    return `What are the Pre Meds for ${drugName}?`;
+  }
+
+  if (normalized === "filter") {
+    return `What is the filter for ${drugName}?`;
+  }
+
+  if (normalized === "assessment") {
+    return `What should be assessed upon arrival for a patient receiving ${drugName}?`;
+  }
+
+  if (normalized === "route/admin" || normalized === "administration") {
+    return `What is the route/admin for ${drugName}?`;
+  }
+
+  if (normalized === "observation") {
+    return `What observation is required for ${drugName}?`;
+  }
+
+  if (normalized === "side effects") {
+    return `What are the side effects of ${drugName}?`;
+  }
+
+  if (normalized === "notes") {
+    return `What are the notes for ${drugName}?`;
+  }
+
+  return `What should you know about ${label} for ${drugName}?`;
+}
+
+function buildFlashcardsFromSections(
+  drugName: string,
+  sections: DrugReferenceSection[]
+): Flashcard[] {
+  return sections.map((section, index) => ({
+    id: createId("card"),
+    drugName,
+    front: buildQuestionForSection(drugName, section.label),
+    back: section.content,
+    category: "Work Mode Generated",
+    tags: ["generated"],
+    sourceRow: index + 1
+  }));
 }
 
 function isMalformedLegacyDeck(deck: Deck): boolean {
@@ -145,6 +209,8 @@ export function App() {
   const [cardEditDraft, setCardEditDraft] = useState<CardEditDraft | null>(null);
   const [isEditingDrug, setIsEditingDrug] = useState(false);
   const [drugEditDraft, setDrugEditDraft] = useState<DrugEditDraft | null>(null);
+  const [isCreatingDrug, setIsCreatingDrug] = useState(false);
+  const [newSectionLabel, setNewSectionLabel] = useState<string>(COMMON_SECTION_LABELS[0]);
   const workSearchRef = useRef<HTMLInputElement | null>(null);
 
   const activeDeck = useMemo(
@@ -203,6 +269,16 @@ export function App() {
 
     if (!search) {
       return sorted;
+    }
+
+    const prefixMatches = sorted.filter((drug) => {
+      const matchesName = drug.drugName.toLowerCase().startsWith(search);
+      const matchesAlias = drug.aliases.some((alias) => alias.toLowerCase().startsWith(search));
+      return matchesName || matchesAlias;
+    });
+
+    if (prefixMatches.length > 0) {
+      return prefixMatches;
     }
 
     return sorted.filter((drug) => drug.searchText.includes(search));
@@ -312,6 +388,7 @@ export function App() {
       setCardEditDraft(null);
       setIsEditingDrug(false);
       setDrugEditDraft(null);
+      setIsCreatingDrug(false);
     });
   }, [activeDeck]);
 
@@ -750,15 +827,26 @@ export function App() {
       aliases: selectedDrug.aliases.join(", "),
       sections: selectedDrug.sections.map((section) => ({ ...section }))
     });
+    setIsCreatingDrug(false);
+    setIsEditingDrug(true);
+  }
+
+  function startDrugCreate() {
+    setDrugEditDraft({
+      drugName: "",
+      aliases: "",
+      sections: []
+    });
+    setIsCreatingDrug(true);
     setIsEditingDrug(true);
   }
 
   async function saveDrugEdit() {
-    if (!activeDeck || !selectedDrug || !drugEditDraft) {
+    if (!activeDeck || !drugEditDraft) {
       return;
     }
 
-    const previousDrugName = selectedDrug.drugName;
+    const previousDrugName = selectedDrug?.drugName ?? "";
     const updatedDrugName = drugEditDraft.drugName.trim() || previousDrugName;
     const aliases = normalizeList(drugEditDraft.aliases);
     const sections = drugEditDraft.sections
@@ -768,6 +856,40 @@ export function App() {
         content: section.content.trim()
       }))
       .filter((section) => section.label && section.content);
+
+    if (!updatedDrugName || sections.length === 0) {
+      setToast("Add a drug name and at least one filled section.");
+      return;
+    }
+
+    if (isCreatingDrug) {
+      const newDrugId = createId("drug");
+      const generatedCards = buildFlashcardsFromSections(updatedDrugName, sections);
+      await persistDeck((deck) => ({
+        ...deck,
+        flashcards: [...deck.flashcards, ...generatedCards],
+        drugReferences: [
+          ...deck.drugReferences,
+          {
+            id: newDrugId,
+            drugName: updatedDrugName,
+            aliases,
+            sections,
+            searchText: buildSearchText(updatedDrugName, aliases, sections)
+          }
+        ]
+      }));
+      setSelectedDrugId(newDrugId);
+      setIsCreatingDrug(false);
+      setIsEditingDrug(false);
+      setDrugEditDraft(null);
+      setToast("Drug added to Work Mode and Study Mode.");
+      return;
+    }
+
+    if (!selectedDrug) {
+      return;
+    }
 
     await persistDeck((deck) => ({
       ...deck,
@@ -795,6 +917,7 @@ export function App() {
     if (studyDrugFilter === previousDrugName) {
       setStudyDrugFilter(updatedDrugName);
     }
+    setIsCreatingDrug(false);
     setIsEditingDrug(false);
     setDrugEditDraft(null);
     setToast("Work Mode details updated.");
@@ -831,6 +954,33 @@ export function App() {
                 content: ""
               }
             ]
+          }
+        : current
+    );
+  }
+
+  function addCommonDrugSection() {
+    const label = newSectionLabel.trim();
+    if (!label) {
+      return;
+    }
+
+    setDrugEditDraft((current) =>
+      current
+        ? {
+            ...current,
+            sections: current.sections.some(
+              (section) => section.label.toLowerCase() === label.toLowerCase()
+            )
+              ? current.sections
+              : [
+                  ...current.sections,
+                  {
+                    id: createId("section"),
+                    label,
+                    content: ""
+                  }
+                ]
           }
         : current
     );
@@ -1197,6 +1347,11 @@ export function App() {
                   placeholder="Type to narrow the list"
                 />
               </label>
+              <div className="button-row">
+                <button className="secondary-button" onClick={startDrugCreate}>
+                  Add drug
+                </button>
+              </div>
               <label className="field-label">
                 Select drug
                 <select
@@ -1291,6 +1446,9 @@ export function App() {
 
                   {isEditingDrug && drugEditDraft ? (
                     <div className="editor-panel">
+                      <div className="panel-header">
+                        <h3>{isCreatingDrug ? "Add Drug" : "Edit Drug"}</h3>
+                      </div>
                       <label className="field-label">
                         Drug name
                         <input
@@ -1314,6 +1472,24 @@ export function App() {
                           placeholder="Levophed, Levo"
                         />
                       </label>
+                      <div className="button-row">
+                        <label className="field-label grow-field">
+                          Add common section
+                          <select
+                            value={newSectionLabel}
+                            onChange={(event) => setNewSectionLabel(event.target.value)}
+                          >
+                            {COMMON_SECTION_LABELS.map((label) => (
+                              <option key={label} value={label}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <button className="secondary-button" onClick={addCommonDrugSection}>
+                          Add selected
+                        </button>
+                      </div>
                       <div className="section-editor-list">
                         {drugEditDraft.sections.map((section) => (
                           <div key={section.id} className="section-editor-card">
@@ -1355,6 +1531,7 @@ export function App() {
                         <button
                           className="secondary-button"
                           onClick={() => {
+                            setIsCreatingDrug(false);
                             setIsEditingDrug(false);
                             setDrugEditDraft(null);
                           }}
