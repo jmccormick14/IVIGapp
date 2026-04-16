@@ -82,6 +82,12 @@ function stripMetadataRows(rows: string[][]): string[][] {
 }
 
 function parseDelimitedRows(content: string, delimiter: string): string[][] {
+  if (delimiter !== ",") {
+    return content
+      .split(/\r?\n/)
+      .map((line) => line.split(delimiter));
+  }
+
   const rows: string[][] = [];
   let currentRow: string[] = [];
   let currentCell = "";

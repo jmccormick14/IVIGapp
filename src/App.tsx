@@ -1048,9 +1048,9 @@ export function App() {
       <aside className="sidebar">
         <div className="brand-block">
           <p className="eyebrow">Offline-first PWA</p>
-          <h1>Study Cards</h1>
+          <h1>Drug Flashcards</h1>
           <p className="lede">
-            Build flashcards, quick-reference cards, and searchable study notes for any subject.
+            Study cards and keep a rapid Work Mode lookup for the drugs you need on shift.
           </p>
         </div>
 
@@ -1381,11 +1381,11 @@ export function App() {
           <section className="content-grid work-layout">
             <aside className="panel work-list-panel">
               <div className="panel-header">
-                <h2>Search Cards</h2>
+                <h2>Drug Lookup</h2>
                 <span className="hint">Press `/` to search</span>
               </div>
               <label className="field-label">
-                Search item
+                Search drug
                 <input
                   ref={workSearchRef}
                   value={workSearch}
@@ -1395,11 +1395,11 @@ export function App() {
               </label>
               <div className="button-row">
                 <button className="secondary-button" onClick={startDrugCreate}>
-                  Add card set
+                  Add drug
                 </button>
               </div>
               <label className="field-label">
-                Select item
+                Select drug
                 <select
                   className="drug-select"
                   size={12}
@@ -1448,7 +1448,7 @@ export function App() {
                 </div>
               ) : null}
               <p className="hint">
-                {alphabeticalDrugs.length} items match the current filter.
+                {alphabeticalDrugs.length} drugs match the current filter.
               </p>
             </aside>
 
@@ -1493,7 +1493,7 @@ export function App() {
                   {isEditingDrug && drugEditDraft ? (
                     <div className="editor-panel">
                       <div className="panel-header">
-                        <h3>{isCreatingDrug ? "Add Card Set" : "Edit Card Set"}</h3>
+                        <h3>{isCreatingDrug ? "Add Drug" : "Edit Drug"}</h3>
                       </div>
                       <label className="field-label">
                         Drug name
