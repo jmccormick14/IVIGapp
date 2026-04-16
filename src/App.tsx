@@ -45,6 +45,7 @@ const importOptions: ImportFieldKey[] = [
 const LEGACY_SHEET_URL =
   "https://docs.google.com/spreadsheets/d/e/2PACX-1vT2AU0SWUQCCt2F5ixm66b-P0hgb94EOYq7NlHM-B2ijn5gTReD4HNLIsncYPku--OIWM-TPpPWYclF/pub?gid=1025900712&single=true&output=tsv";
 const LEGACY_IMPORT_KEY = "legacy-deck-imported";
+const LEGACY_DECK_NAME = "Legacy Drug Sheet";
 
 type ViewMode = "study" | "work";
 type StudyFilter = "all" | "missed" | "mastered";
@@ -79,6 +80,22 @@ function buildSearchText(drugName: string, aliases: string[], sections: DrugRefe
   return [drugName, ...aliases, ...sections.map((section) => `${section.label} ${section.content}`)]
     .join(" ")
     .toLowerCase();
+}
+
+function isMalformedLegacyDeck(deck: Deck): boolean {
+  if (deck.name !== LEGACY_DECK_NAME || deck.flashcards.length === 0) {
+    return false;
+  }
+
+  return deck.flashcards.some((card) => {
+    const combined = `${card.drugName} ${card.front} ${card.back}`;
+    return (
+      combined.includes("\t") ||
+      /Summary\s+[A-Z][a-z]+/.test(combined) ||
+      /Single\s+[A-Z][a-z]+/.test(combined) ||
+      combined.length > 1200
+    );
+  });
 }
 
 function slugifyFileName(value: string): string {
@@ -234,9 +251,18 @@ export function App() {
       await ensureSeedDeck();
       let storedDecks = await getDecks();
       const legacyImported = await getAppSetting<boolean>(LEGACY_IMPORT_KEY);
+      const existingLegacyDeck = storedDecks.find((deck) => deck.name === LEGACY_DECK_NAME);
+      const needsLegacyRepair = existingLegacyDeck ? isMalformedLegacyDeck(existingLegacyDeck) : false;
 
-      if (!legacyImported && storedDecks.length <= 1) {
-        const legacyDeck = await importDeckFromUrl(LEGACY_SHEET_URL, "Legacy Drug Sheet", true);
+      if (existingLegacyDeck && needsLegacyRepair) {
+        const repairedDeck = await refreshLegacyDeck(existingLegacyDeck.id);
+        if (repairedDeck) {
+          storedDecks = await getDecks();
+          setToast("Repaired the original drug sheet import.");
+          setActiveDeckId(repairedDeck.id);
+        }
+      } else if (!legacyImported && storedDecks.length <= 1) {
+        const legacyDeck = await refreshLegacyDeck();
         if (legacyDeck) {
           storedDecks = await getDecks();
           setToast("Imported the original drug sheet for offline use.");
@@ -449,6 +475,31 @@ export function App() {
         setToast(error instanceof Error ? error.message : "Could not load remote import.");
       }
 
+      return null;
+    }
+  }
+
+  async function refreshLegacyDeck(existingDeckId?: string): Promise<Deck | null> {
+    try {
+      const response = await fetch(LEGACY_SHEET_URL);
+      if (!response.ok) {
+        throw new Error(`Import failed with status ${response.status}.`);
+      }
+
+      const content = await response.text();
+      const parsed = parseImportText(content, `${LEGACY_DECK_NAME}.tsv`);
+      const mapping = suggestFieldMapping(parsed.headers);
+      const deck = buildDeckFromImport(LEGACY_DECK_NAME, parsed, mapping);
+      const repairedDeck: Deck = {
+        ...deck,
+        id: existingDeckId ?? deck.id
+      };
+
+      await saveDeck(repairedDeck);
+      await setAppSetting(LEGACY_IMPORT_KEY, true);
+      return repairedDeck;
+    } catch (error) {
+      setToast(error instanceof Error ? error.message : "Could not refresh the legacy drug sheet.");
       return null;
     }
   }
@@ -857,11 +908,8 @@ export function App() {
             </button>
           </div>
           <div className="button-row">
-            <button
-              className="secondary-button"
-              onClick={() => void loadFromUrl(LEGACY_SHEET_URL, "Legacy Drug Sheet")}
-            >
-              Import Original Drug Sheet
+            <button className="secondary-button" onClick={() => void refreshLegacyDeck()}>
+              Refresh Original Drug Sheet
             </button>
           </div>
           {parsedImport ? (
