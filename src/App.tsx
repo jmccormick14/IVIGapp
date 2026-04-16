@@ -208,6 +208,11 @@ export function App() {
     return sorted.filter((drug) => drug.searchText.includes(search));
   }, [activeDeck, pinnedIds, progress?.recentDrugIds, workSearch]);
 
+  const alphabeticalDrugs = useMemo(
+    () => [...filteredDrugs].sort((left, right) => left.drugName.localeCompare(right.drugName)),
+    [filteredDrugs]
+  );
+
   const selectedDrug = useMemo(
     () => activeDeck?.drugReferences.find((drug) => drug.id === selectedDrugId) ?? filteredDrugs[0] ?? null,
     [activeDeck, filteredDrugs, selectedDrugId]
@@ -1173,8 +1178,23 @@ export function App() {
                   ref={workSearchRef}
                   value={workSearch}
                   onChange={(event) => setWorkSearch(event.target.value)}
-                  placeholder="Search by generic, brand, note, or caution"
+                  placeholder="Type to narrow the list"
                 />
+              </label>
+              <label className="field-label">
+                Select drug
+                <select
+                  className="drug-select"
+                  size={12}
+                  value={selectedDrug?.id ?? ""}
+                  onChange={(event) => void openDrug(event.target.value)}
+                >
+                  {alphabeticalDrugs.map((drug) => (
+                    <option key={drug.id} value={drug.id}>
+                      {drug.drugName}
+                    </option>
+                  ))}
+                </select>
               </label>
               {progress && (progress.pinnedDrugIds.length > 0 || progress.recentDrugIds.length > 0) ? (
                 <div className="quick-groups">
@@ -1210,18 +1230,9 @@ export function App() {
                   ) : null}
                 </div>
               ) : null}
-              <div className="work-list">
-                {filteredDrugs.map((drug) => (
-                  <button
-                    key={drug.id}
-                    className={`drug-row ${drug.id === selectedDrug?.id ? "active" : ""}`}
-                    onClick={() => void openDrug(drug.id)}
-                  >
-                    <span>{drug.drugName}</span>
-                    <small>{pinnedIds.has(drug.id) ? "Pinned" : recentIds.has(drug.id) ? "Recent" : "Reference"}</small>
-                  </button>
-                ))}
-              </div>
+              <p className="hint">
+                {alphabeticalDrugs.length} drugs match the current filter.
+              </p>
             </aside>
 
             <article className="panel work-detail-panel">

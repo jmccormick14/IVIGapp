@@ -233,20 +233,56 @@ function buildReferenceSections(row: Record<ImportFieldKey, string>): DrugRefere
 }
 
 function buildLegacySummarySections(row: Record<ImportFieldKey, string>): DrugReferenceSection[] {
-  const summaryLabel = row.front?.trim() || "Summary";
   const summaryContent = row.back?.trim();
 
   if (!summaryContent) {
     return [];
   }
 
+  const parsedSections = extractLegacySummarySections(summaryContent);
+  if (parsedSections.length > 0) {
+    return parsedSections;
+  }
+
   return [
     {
       id: createId("section"),
-      label: summaryLabel,
-      content: summaryContent
+      label: row.front?.trim() || "Summary",
+      content: stripHtml(summaryContent)
     }
   ];
+}
+
+function extractLegacySummarySections(summaryContent: string): DrugReferenceSection[] {
+  const normalized = summaryContent
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/\r/g, "");
+  const matches = Array.from(
+    normalized.matchAll(/<strong>\s*([^:<]+):\s*<\/strong>\s*([\s\S]*?)(?=\n?\s*<strong>|$)/gi)
+  );
+
+  return matches
+    .map((match) => ({
+      id: createId("section"),
+      label: stripHtml(match[1]).trim(),
+      content: stripHtml(match[2]).trim()
+    }))
+    .filter((section) => section.label && section.content);
+}
+
+function stripHtml(value: string): string {
+  return value
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\s+\n/g, "\n")
+    .replace(/\n\s+/g, "\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
 }
 
 export function buildDeckFromImport(

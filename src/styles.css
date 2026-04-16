@@ -116,7 +116,6 @@ button {
 }
 
 .deck-list,
-.work-list,
 .mapping-grid {
   display: grid;
   gap: 10px;
@@ -189,6 +188,11 @@ select {
   border-radius: 14px;
   padding: 12px 14px;
   background: rgba(255, 255, 255, 0.92);
+}
+
+.drug-select {
+  min-height: 320px;
+  background: rgba(255, 255, 255, 0.96);
 }
 
 .content-grid {
