@@ -93,52 +93,54 @@ function buildSearchText(drugName: string, aliases: string[], sections: DrugRefe
     .toLowerCase();
 }
 
-function buildQuestionForSection(drugName: string, label: string): string {
+function buildQuestionForSection(drugName: string, label: string, aliases: string[] = []): string {
   const normalized = label.trim().toLowerCase();
+  const primaryName = aliases.length > 0 ? `${drugName} (${aliases[0]})` : drugName;
 
   if (normalized === "indications" || normalized === "indication") {
-    return `What are the indications for ${drugName}?`;
+    return `What are the indications for ${primaryName}?`;
   }
 
   if (normalized === "pre meds" || normalized === "pre-meds" || normalized === "premeds") {
-    return `What are the Pre Meds for ${drugName}?`;
+    return `What are the Pre Meds for ${primaryName}?`;
   }
 
   if (normalized === "filter") {
-    return `What is the filter for ${drugName}?`;
+    return `What is the filter for ${primaryName}?`;
   }
 
   if (normalized === "assessment") {
-    return `What should be assessed upon arrival for a patient receiving ${drugName}?`;
+    return `What should be assessed upon arrival for a patient receiving ${primaryName}?`;
   }
 
   if (normalized === "route/admin" || normalized === "administration") {
-    return `What is the route/admin for ${drugName}?`;
+    return `What is the route/admin for ${primaryName}?`;
   }
 
   if (normalized === "observation") {
-    return `What observation is required for ${drugName}?`;
+    return `What observation is required for ${primaryName}?`;
   }
 
   if (normalized === "side effects") {
-    return `What are the side effects of ${drugName}?`;
+    return `What are the side effects of ${primaryName}?`;
   }
 
   if (normalized === "notes") {
-    return `What are the notes for ${drugName}?`;
+    return `What are the notes for ${primaryName}?`;
   }
 
-  return `What should you know about ${label} for ${drugName}?`;
+  return `What should you know about ${label} for ${primaryName}?`;
 }
 
 function buildFlashcardsFromSections(
   drugName: string,
-  sections: DrugReferenceSection[]
+  sections: DrugReferenceSection[],
+  aliases: string[] = []
 ): Flashcard[] {
   return sections.map((section, index) => ({
     id: createId("card"),
     drugName,
-    front: buildQuestionForSection(drugName, section.label),
+    front: buildQuestionForSection(drugName, section.label, aliases),
     back: section.content,
     category: "Work Mode Generated",
     tags: ["generated"],
@@ -864,7 +866,7 @@ export function App() {
 
     if (isCreatingDrug) {
       const newDrugId = createId("drug");
-      const generatedCards = buildFlashcardsFromSections(updatedDrugName, sections);
+      const generatedCards = buildFlashcardsFromSections(updatedDrugName, sections, aliases);
       await persistDeck((deck) => ({
         ...deck,
         flashcards: [...deck.flashcards, ...generatedCards],
@@ -1005,9 +1007,9 @@ export function App() {
       <aside className="sidebar">
         <div className="brand-block">
           <p className="eyebrow">Offline-first PWA</p>
-          <h1>Drug Flashcards</h1>
+          <h1>Study Cards</h1>
           <p className="lede">
-            Study cards and keep a rapid Work Mode lookup for the drugs you need on shift.
+            Build flashcards, quick-reference cards, and searchable study notes for any subject.
           </p>
         </div>
 
@@ -1335,11 +1337,11 @@ export function App() {
           <section className="content-grid work-layout">
             <aside className="panel work-list-panel">
               <div className="panel-header">
-                <h2>Drug Lookup</h2>
+                <h2>Search Cards</h2>
                 <span className="hint">Press `/` to search</span>
               </div>
               <label className="field-label">
-                Search drug
+                Search item
                 <input
                   ref={workSearchRef}
                   value={workSearch}
@@ -1349,11 +1351,11 @@ export function App() {
               </label>
               <div className="button-row">
                 <button className="secondary-button" onClick={startDrugCreate}>
-                  Add drug
+                  Add card set
                 </button>
               </div>
               <label className="field-label">
-                Select drug
+                Select item
                 <select
                   className="drug-select"
                   size={12}
@@ -1402,7 +1404,7 @@ export function App() {
                 </div>
               ) : null}
               <p className="hint">
-                {alphabeticalDrugs.length} drugs match the current filter.
+                {alphabeticalDrugs.length} items match the current filter.
               </p>
             </aside>
 
@@ -1447,7 +1449,7 @@ export function App() {
                   {isEditingDrug && drugEditDraft ? (
                     <div className="editor-panel">
                       <div className="panel-header">
-                        <h3>{isCreatingDrug ? "Add Drug" : "Edit Drug"}</h3>
+                        <h3>{isCreatingDrug ? "Add Card Set" : "Edit Card Set"}</h3>
                       </div>
                       <label className="field-label">
                         Drug name
