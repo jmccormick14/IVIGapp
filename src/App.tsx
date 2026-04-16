@@ -638,6 +638,10 @@ export function App() {
 
       await saveDeck(repairedDeck);
       await setAppSetting(LEGACY_IMPORT_KEY, true);
+      await reloadDecks(repairedDeck.id);
+      setSelectedDrugId(repairedDeck.drugReferences[0]?.id ?? "");
+      setCurrentCardIndex(0);
+      setIsCardFlipped(false);
       return repairedDeck;
     } catch (error) {
       setToast(error instanceof Error ? error.message : "Could not refresh the legacy drug sheet.");
