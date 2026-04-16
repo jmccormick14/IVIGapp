@@ -213,6 +213,22 @@ export function App() {
     [filteredDrugs]
   );
 
+  useEffect(() => {
+    if (viewMode !== "work") {
+      return;
+    }
+
+    if (alphabeticalDrugs.length === 0) {
+      setSelectedDrugId("");
+      return;
+    }
+
+    const currentStillVisible = alphabeticalDrugs.some((drug) => drug.id === selectedDrugId);
+    if (!currentStillVisible) {
+      setSelectedDrugId(alphabeticalDrugs[0].id);
+    }
+  }, [alphabeticalDrugs, selectedDrugId, viewMode]);
+
   const selectedDrug = useMemo(
     () => activeDeck?.drugReferences.find((drug) => drug.id === selectedDrugId) ?? filteredDrugs[0] ?? null,
     [activeDeck, filteredDrugs, selectedDrugId]
