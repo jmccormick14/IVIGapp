@@ -191,6 +191,46 @@ function downloadTextFile(filename: string, content: string, mimeType: string): 
   URL.revokeObjectURL(url);
 }
 
+function sanitizeRichTextHtml(value: string): string {
+  if (typeof window === "undefined" || !/[<>]/.test(value)) {
+    return value;
+  }
+
+  const allowedTags = new Set(["STRONG", "B", "EM", "I", "BR", "P", "UL", "OL", "LI"]);
+  const parser = new DOMParser();
+  const document = parser.parseFromString(`<div>${value}</div>`, "text/html");
+
+  const sanitizeNode = (node: Node): void => {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as HTMLElement;
+
+      if (!allowedTags.has(element.tagName)) {
+        const fragment = document.createDocumentFragment();
+        while (element.firstChild) {
+          fragment.appendChild(element.firstChild);
+        }
+        element.replaceWith(fragment);
+        Array.from(fragment.childNodes).forEach(sanitizeNode);
+        return;
+      }
+
+      Array.from(element.attributes).forEach((attribute) => {
+        element.removeAttribute(attribute.name);
+      });
+    }
+
+    Array.from(node.childNodes).forEach(sanitizeNode);
+  };
+
+  const root = document.body.firstElementChild;
+  if (!root) {
+    return value;
+  }
+
+  Array.from(root.childNodes).forEach(sanitizeNode);
+  return root.innerHTML;
+}
+
 export function App() {
   const [decks, setDecks] = useState<Deck[]>([]);
   const [activeDeckId, setActiveDeckId] = useState("");
@@ -244,6 +284,7 @@ export function App() {
   }, [activeDeck, progress, studyDrugFilter, studyFilter]);
 
   const currentCard = studyCards[currentCardIndex] ?? null;
+  const currentCardBackHtml = currentCard ? sanitizeRichTextHtml(currentCard.back) : "";
 
   const filteredDrugs = useMemo(() => {
     if (!activeDeck) {
@@ -1254,7 +1295,10 @@ export function App() {
                       </div>
                       <div className="flashcard-face flashcard-back">
                         <span className="flashcard-label">{currentCard.category ?? "Flashcard"}</span>
-                        <h3>{currentCard.back}</h3>
+                        <div
+                          className="flashcard-rich-content"
+                          dangerouslySetInnerHTML={{ __html: currentCardBackHtml }}
+                        />
                       </div>
                     </button>
                   )}

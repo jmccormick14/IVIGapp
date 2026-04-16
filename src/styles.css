@@ -274,6 +274,25 @@ select {
   opacity: 0.82;
 }
 
+.flashcard-rich-content {
+  display: grid;
+  gap: 10px;
+  font-size: 1.05rem;
+  line-height: 1.55;
+  text-align: left;
+}
+
+.flashcard-rich-content p,
+.flashcard-rich-content ul,
+.flashcard-rich-content ol {
+  margin: 0;
+}
+
+.flashcard-rich-content ul,
+.flashcard-rich-content ol {
+  padding-left: 20px;
+}
+
 .study-progress {
   color: var(--muted);
 }
