@@ -72,6 +72,16 @@ type DrugEditDraft = {
   aliases: string;
   sections: DrugReferenceSection[];
 };
+type ManualDeckDraft = {
+  name: string;
+};
+type ManualCardDraft = {
+  itemName: string;
+  front: string;
+  back: string;
+  category: string;
+  tags: string;
+};
 
 type DeckBackup = {
   version: 1;
@@ -247,6 +257,14 @@ export function App() {
   const [importDraft, setImportDraft] = useState("");
   const [parsedImport, setParsedImport] = useState<ParsedImport | null>(null);
   const [fieldMapping, setFieldMapping] = useState<Record<number, ImportFieldKey>>({});
+  const [manualDeckDraft, setManualDeckDraft] = useState<ManualDeckDraft>({ name: "" });
+  const [manualCardDraft, setManualCardDraft] = useState<ManualCardDraft>({
+    itemName: "",
+    front: "",
+    back: "",
+    category: "",
+    tags: ""
+  });
   const [isEditingCard, setIsEditingCard] = useState(false);
   const [cardEditDraft, setCardEditDraft] = useState<CardEditDraft | null>(null);
   const [isEditingDrug, setIsEditingDrug] = useState(false);
@@ -801,6 +819,70 @@ export function App() {
     setToast("Deck deleted.");
   }
 
+  async function createManualDeck() {
+    const name = manualDeckDraft.name.trim();
+    if (!name) {
+      setToast("Enter a deck name first.");
+      return;
+    }
+
+    const now = new Date().toISOString();
+    const deck: Deck = {
+      id: createId("deck"),
+      name,
+      createdAt: now,
+      updatedAt: now,
+      flashcards: [],
+      drugReferences: []
+    };
+
+    await saveDeck(deck);
+    await reloadDecks(deck.id);
+    setManualDeckDraft({ name: "" });
+    setToast("Deck created.");
+  }
+
+  async function addManualCard() {
+    if (!activeDeck) {
+      setToast("Create or select a deck first.");
+      return;
+    }
+
+    const itemName = manualCardDraft.itemName.trim();
+    const front = manualCardDraft.front.trim();
+    const back = manualCardDraft.back.trim();
+
+    if (!itemName || !front || !back) {
+      setToast("Item name, front, and back are required.");
+      return;
+    }
+
+    await persistDeck((deck) => ({
+      ...deck,
+      flashcards: [
+        ...deck.flashcards,
+        {
+          id: createId("card"),
+          drugName: itemName,
+          front,
+          back,
+          category: manualCardDraft.category.trim() || undefined,
+          tags: normalizeList(manualCardDraft.tags),
+          sourceRow: deck.flashcards.length + 1
+        }
+      ]
+    }));
+
+    setManualCardDraft({
+      itemName,
+      front: "",
+      back: "",
+      category: manualCardDraft.category,
+      tags: manualCardDraft.tags
+    });
+    setToast("Card added to active deck.");
+  }
+
   function focusDrugInStudy(drugName: string) {
     setStudyDrugFilter(drugName);
     setStudyFilter("all");
@@ -1090,6 +1172,91 @@ export function App() {
               Delete active deck
             </button>
           ) : null}
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Create Deck</h2>
+          </div>
+          <label className="field-label">
+            Deck name
+            <input
+              value={manualDeckDraft.name}
+              onChange={(event) => setManualDeckDraft({ name: event.target.value })}
+              placeholder="Microbiology Exam 1"
+            />
+          </label>
+          <div className="button-row">
+            <button className="primary-button" onClick={() => void createManualDeck()}>
+              Create Deck
+            </button>
+          </div>
+        </section>
+
+        <section className="panel">
+          <div className="panel-header">
+            <h2>Add Card</h2>
+          </div>
+          <p className="hint">
+            Adds a flashcard directly to the active deck without using the importer.
+          </p>
+          <label className="field-label">
+            Item name
+            <input
+              value={manualCardDraft.itemName}
+              onChange={(event) =>
+                setManualCardDraft((current) => ({ ...current, itemName: event.target.value }))
+              }
+              placeholder="Cell Membrane"
+            />
+          </label>
+          <label className="field-label">
+            Front
+            <textarea
+              rows={3}
+              value={manualCardDraft.front}
+              onChange={(event) =>
+                setManualCardDraft((current) => ({ ...current, front: event.target.value }))
+              }
+              placeholder="What is the primary function of the cell membrane?"
+            />
+          </label>
+          <label className="field-label">
+            Back
+            <textarea
+              rows={4}
+              value={manualCardDraft.back}
+              onChange={(event) =>
+                setManualCardDraft((current) => ({ ...current, back: event.target.value }))
+              }
+              placeholder="It regulates what enters and leaves the cell."
+            />
+          </label>
+          <label className="field-label">
+            Category
+            <input
+              value={manualCardDraft.category}
+              onChange={(event) =>
+                setManualCardDraft((current) => ({ ...current, category: event.target.value }))
+              }
+              placeholder="Biology"
+            />
+          </label>
+          <label className="field-label">
+            Tags
+            <input
+              value={manualCardDraft.tags}
+              onChange={(event) =>
+                setManualCardDraft((current) => ({ ...current, tags: event.target.value }))
+              }
+              placeholder="exam-1, basics"
+            />
+          </label>
+          <div className="button-row">
+            <button className="primary-button" onClick={() => void addManualCard()}>
+              Add Card To Active Deck
+            </button>
+          </div>
         </section>
 
         <section className="panel">
